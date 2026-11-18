@@ -32,3 +32,16 @@ Online multiplayer uses **Supabase Realtime** (broadcast and presence channels; 
 The project URL and publishable key are in `index.html`. Publishable keys are designed to be public. If online play shows **OFFLINE**, check that Realtime is enabled for the Supabase project, and that public (non-private) channels are allowed under Realtime settings.
 
 If Supabase can't be reached, the game falls back to solo battles against raider AI.
+
+## Anti-cheat
+There's no game server (only Supabase Realtime relays messages), so every player's browser checks the other players:
+- **Sealed code:** the game runs inside a closure with no debug handle, so its state, scrap and weapon stats can't be edited from the browser console. Game data is frozen.
+- **Save data is signed:** editing scrap or unlocks in localStorage resets progress. Scrap gains are also capped per minute.
+- **Weapon checks:** shots are only accepted from weapons in the sender's loadout, at the weapon's real fire rate, and from near the sender's position.
+- **Movement checks:** teleporting, impossible speed, flying out of bounds and impossible armor values are detected.
+- **Damage checks:** each player's game works out the damage it takes, using its own copy of the weapon stats. Players whose armor never drops after taking a lot of confirmed hits are flagged.
+- **Kill and pickup checks:** kills are only credited if you actually hit that player in the last few seconds. Supply-drop claims must come from near the crate.
+- **Flood guard:** players sending too many messages have the extras dropped.
+- **Consequences:** offenders build up strikes and get flagged (⚠ next to their name). A flagged player's attacks are ignored, so they can't hurt anyone.
+
+Limits: a determined cheater can still modify their own copy of the page (for example, to stop taking damage on their own screen). Because each player's game decides what hits it, this mostly can't hurt other players. Fully server-authoritative anti-cheat would need a game server.
