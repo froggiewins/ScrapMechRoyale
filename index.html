@@ -138,10 +138,7 @@ input[type=range]{width:100%;accent-color:#ff9a2e}
     <h3>WASTELAND</h3>
     <div class="row"><span>Sector (online room)</span></div>
     <div class="btnrow" id="sectors"></div>
-    <div class="row"><span>Raider AI mechs</span><span id="botsV"></span></div>
-    <input type="range" id="bots" min="0" max="8" step="1">
-    <div class="row"><span>Raider skill</span></div>
-    <div class="btnrow" id="diffs"></div>
+    <div class="row"><span>Raiders</span><span>4 · Veteran</span></div>
     <div class="row"><span>Mouse sensitivity</span><span id="sensV"></span></div>
     <input type="range" id="sens" min="0.3" max="2.5" step="0.05">
     <div class="row"><span>Graphics quality</span></div>
@@ -277,7 +274,7 @@ let cfg=validCfg(store.get('cfg',null));
 let pilot=String(store.get('name','')||('Pilot-'+(100+Math.random()*900|0))).slice(0,14);
 let scrap=+store.get('scrap',300)||0;
 const unlocked=new Set(store.get('unl',[]));
-const settings=Object.assign({bots:4,diff:'normal',sector:1,sens:1,vol:.7,gfx:'med'},store.get('set',{}));
+const settings=Object.assign({bots:4,diff:'normal',sector:1,sens:1,vol:.7,gfx:'med'},store.get('set',{}),{bots:4,diff:'normal'});
 function save(){store.set('cfg',cfg);store.set('name',pilot);store.set('scrap',scrap);store.set('unl',[...unlocked]);store.set('set',settings)}
 const owned=(kind,k,d)=>!d.cost||unlocked.has(kind+':'+k);
 
@@ -1416,11 +1413,11 @@ function renderGarage(){
     '<div class="controls" style="margin-top:6px">'+(eff<.55?'⚠ Runs hot when firing both arms: vent with R or pace your shots.':'Heat sinks keep up with sustained fire.')+'</div>';
   const se=$('#sectors');se.innerHTML='';[1,2,3].forEach(n=>{const b=document.createElement('button');b.className='btn'+(settings.sector===n?' sel':'');b.textContent='SECTOR '+n;b.onclick=()=>{if(settings.sector===n)return;settings.sector=n;save();renderGarage();if(NET.lobby)netJoin(n);sfx('click')};se.appendChild(b)});
   const gq=$('#gfxq');gq.innerHTML='';[['low','LOW'],['med','MEDIUM'],['high','HIGH']].forEach(([k,l])=>{const b=document.createElement('button');b.className='btn'+(settings.gfx===k?' sel':'');b.textContent=l;b.onclick=()=>{settings.gfx=k;save();applyGfx();renderGarage();sfx('click')};gq.appendChild(b)});
-  const de=$('#diffs');de.innerHTML='';Object.entries(DIFF).forEach(([k,d])=>{const b=document.createElement('button');b.className='btn'+(settings.diff===k?' sel':'');b.textContent=d.label;b.onclick=()=>{settings.diff=k;save();renderGarage();sfx('click')};de.appendChild(b)});
-  $('#bots').value=settings.bots;$('#botsV').textContent=settings.bots;$('#sens').value=settings.sens;$('#sensV').textContent=(+settings.sens).toFixed(2);$('#vol').value=settings.vol;$('#volV').textContent=Math.round(settings.vol*100)+'%';
+
+  $('#sens').value=settings.sens;$('#sensV').textContent=(+settings.sens).toFixed(2);$('#vol').value=settings.vol;$('#volV').textContent=Math.round(settings.vol*100)+'%';
   updNet()}
 $('#callsign').value=pilot;$('#callsign').addEventListener('input',e=>{pilot=e.target.value.replace(/[^\w \-.#]/g,'').slice(0,14)||'Pilot';save()});
-$('#bots').addEventListener('input',e=>{settings.bots=+e.target.value;$('#botsV').textContent=settings.bots;save()});
+
 $('#sens').addEventListener('input',e=>{settings.sens=+e.target.value;$('#sensV').textContent=settings.sens.toFixed(2);save()});
 $('#vol').addEventListener('input',e=>{settings.vol=+e.target.value;$('#volV').textContent=Math.round(settings.vol*100)+'%';if(MASTER)MASTER.gain.value=settings.vol;save()});
 
