@@ -150,7 +150,6 @@ input[type=range]{width:100%;accent-color:#ff9a2e}
     <input type="range" id="vol" min="0" max="1" step="0.05">
     <div id="netStatus"></div>
     <button id="deploy">DEPLOY ▶</button>
-    <button class="btn hidden" id="adminBtn" style="border-color:#c33;color:#ff8a7a">⚙ ADMIN PANEL <small>(` key)</small></button>
     <div class="controls"><b>WASD</b> move · <b>Mouse</b> aim · <b>LMB / RMB</b> fire arms · <b>Q</b> back weapon · <b>SHIFT</b> boost · <b>SPACE</b> hop (hold to glide on hover) · <b>F</b> system · <b>R</b> vent heat · <b>TAB</b> scores · <b>ESC</b> pause<br>Watch your heat: overheat and your mech shuts its guns down. Grab red-flare supply drops and glowing salvage.</div>
   </div>
   <div id="gMsg"></div>
@@ -182,12 +181,12 @@ input[type=range]{width:100%;accent-color:#ff9a2e}
   <div id="scoreline"></div>
   <div id="death" class="hidden"><h1>DESTROYED</h1><p id="deathBy"></p><p id="deathT"></p><div class="hint"><b>G</b> back to garage to refit</div></div>
   <div id="scoreboard" class="panel hidden"></div>
-  <div id="pause" class="hidden"><div class="panel"><h2>PAUSED</h2><button class="btn" id="resume">RESUME</button><button class="btn" id="toGarage">BACK TO GARAGE</button><button class="btn hidden" id="pAdmin" style="border-color:#c33;color:#ff8a7a">ADMIN PANEL</button><div class="controls" style="margin-top:6px">Online matches keep running while paused.</div></div></div>
+  <div id="pause" class="hidden"><div class="panel"><h2>PAUSED</h2><button class="btn" id="resume">RESUME</button><button class="btn" id="toGarage">BACK TO GARAGE</button><div class="controls" style="margin-top:6px">Online matches keep running while paused.</div></div></div>
 </div>
-<div id="admin" class="panel hidden"><div class="ahead"><b>⚙ ADMIN PANEL</b><button class="btn" id="adminClose">✕</button></div><div id="adminBody"></div></div>
 <div id="loading">BOOTING REACTOR…</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
@@ -1317,27 +1316,28 @@ function renderScores(){const sb=$('#scoreboard');sb.innerHTML='';const h=docume
   for(const [m,cl] of rows){const tr=document.createElement('tr');tr.className=cl;[m.kind==='me'?m.name+' (you)':m.kind==='bot'?'⚠ '+m.name:m.name,CHASSIS[m.cfg.ch].name,m.kills,m.deaths,m.kind==='bot'?'AI':m.kind==='me'?'—':cl==='gar'?'garage':'live'].forEach(x=>{const td=document.createElement('td');td.textContent=x;tr.appendChild(td)});t.appendChild(tr)}
   sb.appendChild(t)}
 
-// ================= NETWORK (room capability) =================
-const NET={state:'off',lobby:null,r:null,peer:null,unsubs:[],seq:0,shots:[],lastSend:0,joinN:0};
+// ================= NETWORK (Supabase Realtime) =================
+const SUPA_URL='https://gtkfaywiarlmnoymxnru.supabase.co',SUPA_KEY='sb_publishable_jYXgU2dnAarQ3zBcGUFjIg_8JId4Q41';
+const NET={state:'off',sb:null,ch:null,r:null,peer:'p'+Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4),seq:0,shots:[],lastSend:0,joinN:0,seen:new Map(),lastClean:0};
 async function netInit(){NET.state='wait';updNet();
-  for(let i=0;i<60&&!(window.claude&&typeof window.claude.use==='function');i++)await new Promise(r=>setTimeout(r,100));
-  let room=null;try{if(window.claude&&window.claude.use)room=await window.claude.use('room')}catch(e){room=null}
-  if(!room){NET.state='off';updNet();return}NET.lobby=room;await netJoin(settings.sector)}
-async function netJoin(n){const my=++NET.joinN;NET.unsubs.forEach(u=>{try{u()}catch(e){}});NET.unsubs=[];
-  if(NET.r&&NET.r!==NET.lobby){const old=NET.r;NET.r=null;try{await old.leave()}catch(e){}}
-  for(const rm of G.remotes.values()){rm.remove();}G.remotes.clear();
-  let r=NET.lobby;try{r=await NET.lobby.join('irondust-s'+n)}catch(e){r=NET.lobby}
-  if(my!==NET.joinN)return;NET.r=r;NET.state='wait';updNet();
-  const onErr=e=>{if(e&&['revoked','not_granted','capability_disabled','capability_removed','transform_error'].includes(e.code)){NET.state='off';NET.r=null;for(const rm of G.remotes.values())rm.remove();G.remotes.clear();updNet()}};
-  NET.unsubs.push(r.onPeers(ch=>onPeers(ch),onErr));
-  NET.unsubs.push(r.on('admin',msg=>onAdminMsg(msg)));
-  NET.unsubs.push(r.onConnection(c=>{if(NET.r!==r)return;NET.state=c?'on':'wait';updNet()},onErr));
-  netSend(true)}
+  if(!(window.supabase&&window.supabase.createClient)){NET.state='off';updNet();return}
+  try{NET.sb=window.supabase.createClient(SUPA_URL,SUPA_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},realtime:{params:{eventsPerSecond:30}}})}catch(e){console.error(e);NET.state='off';updNet();return}
+  await netJoin(settings.sector)}
+function removeRemote(id){const rm=G.remotes.get(id);if(rm){rm.remove();G.remotes.delete(id)}NET.seen.delete(id)}
+async function netJoin(n){const my=++NET.joinN;
+  if(NET.ch){const old=NET.ch;NET.ch=null;NET.r=null;try{await NET.sb.removeChannel(old)}catch(e){}}
+  for(const id of [...G.remotes.keys()])removeRemote(id);if(!NET.sb)return;NET.state='wait';updNet();
+  const ch=NET.sb.channel('irondust-s'+n,{config:{broadcast:{self:false,ack:false},presence:{key:NET.peer}}});NET.ch=ch;
+  ch.on('broadcast',{event:'st'},({payload})=>{if(my!==NET.joinN)return;const s=payload;if(!s||typeof s.id!=='string'||s.id.length>40||s.id===NET.peer)return;
+      NET.seen.set(s.id,performance.now());updateRemote({peer:s.id,sameTab:false,kind:'viewer',presence:s});if(!G.remotes.has(s.id))return;updNet()})
+    .on('presence',{event:'leave'},({key})=>{if(my!==NET.joinN)return;if(typeof key==='string'&&key!==NET.peer){removeRemote(key);updNet()}})
+    .subscribe(status=>{if(my!==NET.joinN)return;
+      if(status==='SUBSCRIBED'){NET.r=ch;NET.state='on';ch.track({id:NET.peer}).catch(()=>{});netSend(true)}
+      else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){NET.r=null;NET.state='wait'}
+      else if(status==='CLOSED'){NET.r=null;NET.state='off'}
+      updNet()})}
 function numOk(v,lim){return typeof v==='number'&&isFinite(v)&&Math.abs(v)<=lim}
-function onPeers(ch){
-  for(const p of ch.peers){if(p.sameTab){NET.peer=p.peer;continue}if(p.kind!=='viewer')continue;updateRemote(p)}
-  for(const p of ch.left){const rm=G.remotes.get(p.peer);if(rm){rm.remove();G.remotes.delete(p.peer)}}
-  updNet()}
+function netClean(){const now=performance.now();if(now-NET.lastClean<1000)return;NET.lastClean=now;for(const [id,t] of NET.seen)if(now-t>8000){removeRemote(id);updNet()}}
 function updateRemote(p){const s=p.presence;if(!s||s.v!==1)return;let rm=G.remotes.get(p.peer);const nm=(typeof s.n==='string'?s.n.replace(/[\u0000-\u001f]/g,'').slice(0,14):'')||'Pilot';
   const cf=typeof s.cf==='string'?s.cf.slice(0,80):'';
   if(!rm){rm=new Mech(parseCfg(cf),'remote',nm,p.peer);rm.cfs=cf;rm.lastShot=Array.isArray(s.sq)?Math.max(0,...s.sq.map(q=>q&&numOk(q.i,1e9)?q.i:0)):0;rm.lastD=numOk(s.d,1e6)?s.d:0;rm.tpos=new V3();rm.fired=-9;rm.lastPk=s.pk;G.remotes.set(p.peer,rm)}
@@ -1359,16 +1359,17 @@ function updateRemote(p){const s=p.presence;if(!s||s.v!==1)return;let rm=G.remot
       if(q.w==='missile'){const tg=q.tg===NET.peer?G.me:(typeof q.tg==='string'?G.remotes.get(q.tg):null)||null;fireShotHoming(rm,o,d,q.s|0,tg)}
       else{const sd=numOk(q.sd,3)?q.sd|0:0;if(sd>=0&&sd<3)rm.swing[sd]=1;fireShot(rm,q.w,o,d,q.s|0,numOk(q.sp,2)?q.sp:1,null)}}}}
 function netShot(w,o,d,seed,sp,tg,sd){NET.shots.push({i:++NET.seq,w,sd:sd|0,o:[r2(o.x),r2(o.y),r2(o.z)],d:[r3(d.x),r3(d.y),r3(d.z)],s:seed,sp:r2(sp),tg:tg||null});if(NET.shots.length>12)NET.shots.shift();netSend(true)}
-function netSend(force){if(!NET.r)return;const now=performance.now();if(!force&&now-NET.lastSend<66)return;if(force&&now-NET.lastSend<30){NET.pending=true;return}NET.lastSend=now;NET.pending=false;
-  const m=G.me,play=G.mode==='play'&&m;const pr={v:1,g:play?0:1,n:pilot,cf:cfgStr(cfg),k:m?m.kills:0,d:m?m.deaths:0,al:play&&m.alive?1:0,sq:NET.shots,pk:G.myPk==null?null:G.myPk,dk:G.myDeath||null};
+function netSend(force){if(!NET.r||NET.state!=='on')return;const now=performance.now();const play=G.mode==='play'&&G.me;const gap=play?110:700;
+  if(!force&&now-NET.lastSend<gap)return;if(force&&now-NET.lastSend<55){NET.pending=true;return}NET.lastSend=now;NET.pending=false;netClean();
+  const m=G.me;const pr={v:1,id:NET.peer,g:play?0:1,n:pilot,cf:cfgStr(cfg),k:m?m.kills:0,d:m?m.deaths:0,al:play&&m.alive?1:0,sq:NET.shots,pk:G.myPk==null?null:G.myPk,dk:G.myDeath||null};
   if(play){Object.assign(pr,{x:r2(m.pos.x),y:r2(m.pos.y),z:r2(m.pos.z),ly:r3(m.legsYaw),ay:r3(m.aimYaw),ap:r3(m.aimPitch),hp:Math.round(Math.max(0,m.hp)),sh:m.shield>0?1:0,tp:r2(m.down||0),td:r2(m.fallDir||0),j:m.jetT>0||m.boosting||!m.onGround?1:0})}
-  NET.r.presence(pr).catch(()=>{})}
+  NET.r.send({type:'broadcast',event:'st',payload:pr}).catch(()=>{})}
 function updateRemotes(dt){for(const rm of G.remotes.values()){if(!rm.alive)continue;const op=tmpA.copy(rm.pos);rm.pos.lerp(rm.tpos,Math.min(1,dt*12));
     if(rm.pos.distanceTo(rm.tpos)>25)rm.pos.copy(rm.tpos);rm.vel.copy(rm.pos).sub(op).divideScalar(Math.max(dt,1e-3));rm.vel.y=0;
     rm.legsYaw=lerpA(rm.legsYaw,rm.tly,Math.min(1,dt*10));rm.aimYaw=lerpA(rm.aimYaw,rm.tay,Math.min(1,dt*14));const lw=Math.cos(wrapA(Math.atan2(rm.vel.x,rm.vel.z)-rm.legsYaw));rm.walkDir=lw<-.2?-1:1}}
 function updNet(){const el=$('#netStatus');if(!el)return;const n=[...G.remotes.values()];const dep=n.filter(r=>!r.hidden).length;
   el.classList.toggle('on',NET.state==='on');
-  el.textContent=NET.state==='on'?('● ONLINE: Sector '+settings.sector+' has '+n.length+' other pilot'+(n.length===1?'':'s')+' ('+dep+' deployed). Anyone who opens this page joins the same sector live.'):NET.state==='wait'?'○ Connecting to the wasteland…':(/claude\.ai|claudeusercontent/.test(location.hostname)?'○ OFFLINE: fighting raider AI only. Share this page with your team to battle each other live.':'○ OFFLINE: solo battles against raider AI. Live online play is only available on the Claude-hosted version.')}
+  el.textContent=NET.state==='on'?('● ONLINE: Sector '+settings.sector+' has '+n.length+' other pilot'+(n.length===1?'':'s')+' ('+dep+' deployed). Anyone who opens this page joins the same sector live.'):NET.state==='wait'?'○ Connecting to the online server…':'○ OFFLINE: can\'t reach the online server right now, so you\'re fighting raider AI only.'}
 
 // ================= GARAGE =================
 const gScene=new THREE.Scene();gScene.background=new THREE.Color(0x17120e);gScene.fog=new THREE.Fog(0x17120e,25,60);
@@ -1425,13 +1426,7 @@ $('#vol').addEventListener('input',e=>{settings.vol=+e.target.value;$('#volV').t
 
 // ================= ADMIN =================
 const ADMIN={is:false,open:false,god:false,noHeat:false,noCd:false,rapid:false,oneHit:false,lowGrav:false,dmgMul:1,spdMul:1,freeze:false,ignore:false,all:true,tod:'day',spawn:{ch:'jugg',wl:'rail',wr:'rocket',wb:'none'},confirm:0};
-async function adminInit(){for(let i=0;i<60&&!(window.claude&&typeof window.claude.use==='function');i++)await new Promise(r=>setTimeout(r,100));
-  let u=null;try{if(window.claude&&window.claude.use)u=await window.claude.use('user')}catch(e){}if(!u)return;
-  let ok=false;try{ok=!!(await u.canEdit())}catch(e){}ADMIN.is=ok;if(ok){$('#adminBtn').classList.remove('hidden');$('#pAdmin').classList.remove('hidden')}}
-function toggleAdmin(open){if(!ADMIN.is)return;ADMIN.open=open;$('#admin').classList.toggle('hidden',!open);
-  if(open){renderAdmin();if(document.pointerLockElement)document.exitPointerLock();G.mL=G.mR=false;G.keys={}}
-  else if(G.mode==='play'){G.paused=false;$('#pause').classList.add('hidden');lockPointer()}}
-$('#adminBtn').onclick=()=>toggleAdmin(true);$('#pAdmin').onclick=()=>{$('#pause').classList.add('hidden');G.paused=false;toggleAdmin(true)};$('#adminClose').onclick=()=>toggleAdmin(false);
+function toggleAdmin(){}
 const TOD={day:{sun:0xffd6a0,si:1.55,hs:0xf0d0a8,hg:0x5a4030,hi:.42,top:0x5f7480,hor:0xe6ad72,fog:0xc99c6c,dir:[.55,.42,.32],ex:1.08,mesa:1,glow:1},
   sunset:{sun:0xff7a3a,si:1.3,hs:0xffa070,hg:0x402030,hi:.32,top:0x2c3358,hor:0xff7a3a,fog:0xb8664a,dir:[.75,.1,.3],ex:1.1,mesa:.7,glow:1.4},
   night:{sun:0x8ea0d0,si:.45,hs:0x40507a,hg:0x101010,hi:.16,top:0x03050c,hor:0x1a2232,fog:0x141a26,dir:[-.4,.55,-.3],ex:1.25,mesa:.2,glow:.12}};
@@ -1443,46 +1438,6 @@ function spawnDrop(x,z){const g=new THREE.Group();const box=new THREE.Mesh(BOXG,
 function updateDrops(dt){for(let i=G.drops.length-1;i>=0;i--){const d=G.drops[i];d.t+=dt;const y=Math.max(0,70-d.t*14);d.g.position.y=y;d.ch.visible=y>0;if(Math.random()<.5)PA.emit(d.x,.3,d.z,rand(-.5,.5),rand(4,8),rand(-.5,.5),COL.red,1.2,1.2,1,.5,0,.8);
     const me=G.me;if(y===0&&me&&me.alive&&Math.hypot(me.pos.x-d.x,me.pos.z-d.z)<4+me.R&&me.pos.y<3){me.hp=me.maxHp;me.heat=0;me.energy=100;me.modCd=0;me.overheat=0;sfx('pickup');tip('ADMIN DROP: fully restored',1.5);d.t=999}
     if(d.t>120){scene.remove(d.g);G.drops.splice(i,1)}}}
-function adminWorld(a,data){const msg=Object.assign({a},data||{});applyAdmin(msg);if(ADMIN.all&&NET.r&&NET.state==='on')NET.r.emit('admin',msg).catch(e=>{if(e&&e.code==='not_permitted')tip('Room refused admin broadcast',1.5)})}
-function applyAdmin(d){if(!d||typeof d!=='object')return;
-  if(d.a==='storm')setStorm(!!d.on);
-  else if(d.a==='tod'&&TOD[d.k])setTOD(d.k);
-  else if(d.a==='msg'&&typeof d.t==='string'){announce('📢 ADMIN',d.t.replace(/[\u0000-\u001f]/g,'').slice(0,80));annT=5}
-  else if(d.a==='drop'&&numOk(d.x,ARENA)&&numOk(d.z,ARENA)){if(G.mode==='play')spawnDrop(d.x,d.z)}
-  else if(d.a==='scores'){if(G.me){G.me.kills=0;G.me.deaths=0;G.me.streak=0}for(const b of G.bots){b.kills=0;b.deaths=0}if(G.mode==='play')tip('Scores reset by admin',2)}}
-function onAdminMsg(m){if(!m||m.sameTab)return;applyAdmin(m.data)}
-function spawnRaider(over,atAim){if(G.mode!=='play'){gMsg('Deploy first to spawn raiders');return}if(G.bots.length>=20){tip('Raider limit (20) reached',1.2);return}
-  const b=makeBot(over);G.bots.push(b);rebuildMechList();respawn(b);if(atAim){const ap=G.aimPoint;if(!blocked(ap.x,ap.z,b.R)){b.pos.set(ap.x,0,ap.z);b.rig.group.position.copy(b.pos);b.rig.group.updateMatrixWorld(true)}}rebuildMechList()}
-function renderAdmin(){const el=$('#adminBody');el.innerHTML='';let row;
-  const sec=(t)=>{const h=document.createElement('h3');h.textContent=t;el.appendChild(h)};
-  const newRow=()=>{row=document.createElement('div');row.className='btnrow';el.appendChild(row);return row};
-  const btn=(label,fn,sel)=>{const b=document.createElement('button');b.className='btn'+(sel?' sel':'');b.textContent=label;b.onclick=()=>{initAudio();fn();sfx('click');renderAdmin()};row.appendChild(b);return b};
-  const tog=(label,key)=>btn((ADMIN[key]?'✔ ':'')+label,()=>{ADMIN[key]=!ADMIN[key]},ADMIN[key]);
-  const slider=(label,key,min,max,step)=>{const r=document.createElement('div');r.className='row';const a=document.createElement('span');a.textContent=label;const v=document.createElement('span');v.textContent=ADMIN[key]+'×';r.append(a,v);el.appendChild(r);const i=document.createElement('input');i.type='range';i.min=min;i.max=max;i.step=step;i.value=ADMIN[key];i.oninput=()=>{ADMIN[key]=+i.value;v.textContent=ADMIN[key]+'×'};el.appendChild(i)};
-  const note=t=>{const n=document.createElement('div');n.className='note';n.textContent=t;el.appendChild(n)};
-  const sel=(key,opts)=>{const s=document.createElement('select');for(const [k,n] of opts){const o=document.createElement('option');o.value=k;o.textContent=n;if(ADMIN.spawn[key]===k)o.selected=true;s.appendChild(o)}s.onchange=()=>{ADMIN.spawn[key]=s.value};row.appendChild(s)};
-  const play=G.mode==='play'&&G.me;
-  sec('YOUR MECH');newRow();tog('God mode','god');tog('No heat','noHeat');tog('No system cooldown','noCd');newRow();tog('Rapid fire 3×','rapid');tog('One-hit kills','oneHit');tog('Low gravity','lowGrav');
-  slider('Damage multiplier','dmgMul',1,10,.5);slider('Speed multiplier','spdMul',.5,3,.1);
-  newRow();btn('Full repair',()=>{if(play){const m=G.me;m.hp=m.maxHp;m.heat=0;m.energy=100;m.modCd=0;m.overheat=0;m.slowT=0;m.burnT=0}});btn('Teleport to crosshair',()=>{if(play&&G.me.alive){const ap=G.aimPoint;if(!blocked(ap.x,ap.z,G.me.R)){G.me.pos.set(ap.x,0,ap.z);G.me.vel.set(0,0,0)}else tip('Blocked spot',1)}});btn('Respawn',()=>{if(play)respawn(G.me)});
-  note('Damage boosts and one-hit kills affect raiders. Other online pilots work out their own damage, so they stay fair.');
-  sec('PROGRESS');newRow();btn('+1000 scrap',()=>{addScrap(1000);if(G.mode==='garage')renderGarage()});btn('Unlock everything',()=>{for(const [k,d] of Object.entries(CHASSIS))if(d.cost)unlocked.add('ch:'+k);for(const [k,d] of Object.entries(WEAPONS))if(d.cost)unlocked.add('w:'+k);for(const [k,d] of Object.entries(MODULES))if(d.cost)unlocked.add('mod:'+k);save();if(G.mode==='garage')renderGarage()});
-  btn(Date.now()-ADMIN.confirm<3000?'Click again to confirm':'Reset progress',()=>{if(Date.now()-ADMIN.confirm<3000){unlocked.clear();scrap=300;cfg=validCfg(null);save();ADMIN.confirm=0;if(G.mode==='garage'){renderGarage();rebuildPreview()}}else ADMIN.confirm=Date.now()});
-  sec('RAIDERS · '+G.bots.length+' active');newRow();btn('Spawn 1',()=>spawnRaider());btn('Spawn 5',()=>{for(let i=0;i<5;i++)spawnRaider()});btn('Kill all',()=>{for(const b of G.bots)if(b.alive)kill(b,null,null)});btn('Remove all',()=>{for(const b of G.bots)b.remove();G.bots=[];rebuildMechList()});
-  newRow();tog('Freeze raiders','freeze');tog('Raiders ignore me','ignore');
-  newRow();sel('ch',Object.entries(CHASSIS).map(([k,d])=>[k,d.name]));sel('wl',Object.keys(WEAPONS).filter(isArm).map(k=>[k,WEAPONS[k].name]));
-  newRow();sel('wr',Object.keys(WEAPONS).filter(isArm).map(k=>[k,WEAPONS[k].name]));sel('wb',[['none','No back'],...Object.keys(WEAPONS).filter(k=>WEAPONS[k].back).map(k=>[k,WEAPONS[k].name])]);
-  newRow();btn('Spawn custom raider at crosshair',()=>spawnRaider(Object.assign({},ADMIN.spawn),true));
-  if(!play)note('Deploy to spawn and control raiders.');
-  sec('WORLD');const on=NET.state==='on';
-  if(on){newRow();tog('Apply to everyone in Sector '+settings.sector,'all')}
-  newRow();btn(G.stormOn?'Stop dust storm':'Start dust storm',()=>adminWorld('storm',{on:!G.stormOn}));btn('Supply drop on me',()=>{if(play)adminWorld('drop',{x:r2(clamp(G.me.pos.x,-ARENA+5,ARENA-5)),z:r2(clamp(G.me.pos.z,-ARENA+5,ARENA-5))})});
-  newRow();for(const k of['day','sunset','night'])btn(k.toUpperCase(),()=>adminWorld('tod',{k}),ADMIN.tod===k);
-  newRow();const inp=document.createElement('input');inp.type='text';inp.maxLength=80;inp.placeholder='Message to show everyone…';inp.style.flex='1';row.appendChild(inp);
-  const sb=document.createElement('button');sb.className='btn';sb.textContent='Broadcast';sb.onclick=()=>{const t=inp.value.trim();if(t){adminWorld('msg',{t});inp.value=''}};row.appendChild(sb);
-  newRow();btn('Reset everyone\'s scores',()=>adminWorld('scores',{}));
-  note(on?(ADMIN.all?'World changes are sent live to every pilot in this sector.':'World changes only affect your screen.'):'Offline: world changes only affect your screen.');}
-
 // ================= MODE SWITCHING =================
 function lockPointer(){try{const p=canvas.requestPointerLock&&canvas.requestPointerLock();if(p&&p.catch)p.catch(()=>{})}catch(e){}}
 function deploy(){initAudio();
@@ -1508,7 +1463,7 @@ canvas.addEventListener('mousedown',e=>{if(G.mode!=='play'||ADMIN.open)return;in
 addEventListener('mouseup',e=>{if(e.button===0)G.mL=false;if(e.button===2)G.mR=false;if(e.button===1)G.mM=false});
 addEventListener('contextmenu',e=>{if(G.mode==='play')e.preventDefault()});
 addEventListener('blur',()=>{G.keys={};G.mL=G.mR=false});
-addEventListener('keydown',e=>{if(e.target&&e.target.tagName==='INPUT')return;if(e.code==='Backquote'&&ADMIN.is){toggleAdmin(!ADMIN.open);return}G.keys[e.code]=true;if(G.mode!=='play')return;
+addEventListener('keydown',e=>{if(e.target&&e.target.tagName==='INPUT')return;G.keys[e.code]=true;if(G.mode!=='play')return;
   if(e.code==='Tab'){e.preventDefault();G.showScores=true;$('#scoreboard').classList.remove('hidden')}
   if(e.code==='Escape'&&!G.locked){G.paused=!G.paused;$('#pause').classList.toggle('hidden',!G.paused)}
   if(G.paused)return;const m=G.me;
@@ -1533,11 +1488,11 @@ function updatePlay(dt){
 let last=performance.now();
 function frame(now){requestAnimationFrame(frame);const dt=Math.min(.05,(now-last)/1000)||.016;last=now;G.time+=dt;sndCount=0;
   try{if(G.mode==='garage'){updateGarage(dt);renderFrame(gScene,gCam)}else if(G.mode==='play'){updatePlay(dt);renderFrame(scene,camera)}}catch(err){console.error(err)}
-  if(NET.r){netSend(!!NET.pending)}}
+  if(NET.r){netSend(!!NET.pending)}else if(NET.sb)netClean()}
 // boot
 updateEnv();enhanceMaterials(scene);enhanceMaterials(gScene);applyGfx();buildRadarStatic();updatePointScale();renderGarage();rebuildPreview();G.mode='garage';$('#garage').classList.remove('hidden');$('#loading').classList.add('hidden');
 tumbles.forEach((t,i)=>t.userData.k=i);
-requestAnimationFrame(frame);netInit();adminInit();
+requestAnimationFrame(frame);netInit();
 window.__irondust={G,NET,deploy,toGarage,setCfg:o=>{Object.assign(cfg,o);renderGarage();rebuildPreview()},step:(n,dt=1/30)=>{for(let i=0;i<n;i++){G.time+=dt;sndCount=0;updatePlay(dt)}}};
 </script>
 </body></html>
