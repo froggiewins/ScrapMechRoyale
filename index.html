@@ -138,7 +138,7 @@ input[type=range]{width:100%;accent-color:#ff9a2e}
     <h3>WASTELAND</h3>
     <div class="row"><span>Sector (online room)</span></div>
     <div class="btnrow" id="sectors"></div>
-    <div class="row"><span>Raiders</span><span>4 · Veteran</span></div>
+    <div class="row"><span>Raiders</span><span>4 · Rookie</span></div>
     <div class="row"><span>Mouse sensitivity</span><span id="sensV"></span></div>
     <input type="range" id="sens" min="0.3" max="2.5" step="0.05">
     <div class="row"><span>Graphics quality</span></div>
@@ -274,7 +274,7 @@ let cfg=validCfg(store.get('cfg',null));
 let pilot=String(store.get('name','')||('Pilot-'+(100+Math.random()*900|0))).slice(0,14);
 let scrap=+store.get('scrap',300)||0;
 const unlocked=new Set(store.get('unl',[]));
-const settings=Object.assign({bots:4,diff:'normal',sector:1,sens:1,vol:.7,gfx:'med'},store.get('set',{}),{bots:4,diff:'normal'});
+const settings=Object.assign({bots:4,diff:'normal',sector:1,sens:1,vol:.7,gfx:'med'},store.get('set',{}),{bots:4,diff:'easy'});
 function save(){store.set('cfg',cfg);store.set('name',pilot);store.set('scrap',scrap);store.set('unl',[...unlocked]);store.set('set',settings)}
 const owned=(kind,k,d)=>!d.cost||unlocked.has(kind+':'+k);
 
