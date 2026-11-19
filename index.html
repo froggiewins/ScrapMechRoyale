@@ -151,6 +151,7 @@ body.touch #radar{transform:scale(max(.55,calc(var(--ui)*.85)))}body.touch #kill
     <h3>HULL PAINT</h3><div class="swatches" id="sw1"></div>
     <h3>ACCENT &amp; VISOR</h3><div class="swatches" id="sw2"></div>
     <h3>PATTERN</h3><div class="btnrow" id="pats"></div>
+    <h3>WEATHERING</h3><div class="btnrow" id="wears"></div>
   </div>
   <div id="gRight" class="panel">
     <div id="scrapBox"></div>
@@ -286,12 +287,12 @@ const C1S=['#7a8a5a','#8b8780','#a8553a','#3e5a73','#c9b48a','#2e2d30','#e2dccb'
 const C2S=['#e0a030','#d23a2a','#30b0d0','#90e040','#f0f0f0','#ff60a0','#ffd400','#a070ff','#ff7a1a','#30e0a0'];
 const PATS=['solid','stripes','camo','hazard','digital'];
 const COL_EXTRA=1;
-const DEF_CFG={ch:'striker',wl:'ac',wr:'laser',wb:'none',mod:'shield',c1:'#7a8a5a',c2:'#e0a030',pat:'camo'};
+const DEF_CFG={ch:'striker',wl:'ac',wr:'laser',wb:'none',mod:'shield',c1:'#7a8a5a',c2:'#e0a030',pat:'camo',wear:1};
 const isArm=k=>WEAPONS[k]&&!WEAPONS[k].hidden&&!WEAPONS[k].back, isBack=k=>k==='none'||(WEAPONS[k]&&WEAPONS[k].back);
 const HEXRE=/^#[0-9a-fA-F]{6}$/;
-function validCfg(c){const o=Object.assign({},DEF_CFG);if(c&&typeof c==='object'){if(CHASSIS[c.ch])o.ch=c.ch;if(isArm(c.wl))o.wl=c.wl;if(isArm(c.wr))o.wr=c.wr;if(isBack(c.wb))o.wb=c.wb;if(MODULES[c.mod])o.mod=c.mod;if(HEXRE.test(c.c1))o.c1=c.c1;if(HEXRE.test(c.c2))o.c2=c.c2;if(PATS.includes(c.pat))o.pat=c.pat;}return o}
-const cfgStr=c=>[c.ch,c.wl,c.wr,c.mod,c.c1,c.c2,c.pat,c.wb].join('|');
-function parseCfg(s){if(typeof s!=='string')return validCfg(null);const p=s.split('|');return validCfg({ch:p[0],wl:p[1],wr:p[2],mod:p[3],c1:p[4],c2:p[5],pat:p[6],wb:p[7]})}
+function validCfg(c){const o=Object.assign({},DEF_CFG);if(c&&typeof c==='object'){if(CHASSIS[c.ch])o.ch=c.ch;if(isArm(c.wl))o.wl=c.wl;if(isArm(c.wr))o.wr=c.wr;if(isBack(c.wb))o.wb=c.wb;if(MODULES[c.mod])o.mod=c.mod;if(HEXRE.test(c.c1))o.c1=c.c1;if(HEXRE.test(c.c2))o.c2=c.c2;if(PATS.includes(c.pat))o.pat=c.pat;if([0,1,2].includes(+c.wear))o.wear=+c.wear;}return o}
+const cfgStr=c=>[c.ch,c.wl,c.wr,c.mod,c.c1,c.c2,c.pat,c.wb,c.wear==null?1:c.wear].join('|');
+function parseCfg(s){if(typeof s!=='string')return validCfg(null);const p=s.split('|');return validCfg({ch:p[0],wl:p[1],wr:p[2],mod:p[3],c1:p[4],c2:p[5],pat:p[6],wb:p[7],wear:p[8]==null?1:+p[8]})}
 const DIFF={easy:{err:.15,think:1.0,heat:.5,dmg:.4,acq:1.4,fire:[.9,1.4],rest:[1.4,2.4],label:'Rookie'},normal:{err:.1,think:.75,heat:.62,dmg:.6,acq:1.0,fire:[1.1,1.8],rest:[1,1.8],label:'Veteran'},hard:{err:.06,think:.45,heat:.8,dmg:.85,acq:.6,fire:[1.5,2.4],rest:[.6,1.2],label:'Warlord'}};
 const BOT_NAMES=['Rustjaw','Ash Viper','Scrapper-9','Dune Hag','Cinder','Gravemaw','Hollow Jack','Sandreaper','Mag-Lev','Old Tom','Brimstone','Vulture-3','Kettle','Ironsides','Gutshot','Saltlick'];
 
@@ -344,8 +345,8 @@ const MAT={
   win:new THREE.MeshStandardMaterial({color:0x15120f,roughness:1}),
   rock:new THREE.MeshStandardMaterial({color:0x6e4e38,roughness:1,flatShading:true}),
   wood:new THREE.MeshStandardMaterial({color:0x3b2b1f,roughness:1}),
-  mechDark:new THREE.MeshStandardMaterial({color:0x2c2a27,roughness:.6,metalness:.35}),
-  metal:new THREE.MeshStandardMaterial({color:0x6a655e,roughness:.45,metalness:.5}),
+  mechDark:new THREE.MeshStandardMaterial({map:canvasTex(128,(g,s)=>{g.fillStyle='#2c2a27';g.fillRect(0,0,s,s);weather(g,s,1,{chips:.5,rust:1.2,dust:.9})}),roughness:.68,metalness:.35}),
+  metal:new THREE.MeshStandardMaterial({map:canvasTex(128,(g,s)=>{g.fillStyle='#6a655e';g.fillRect(0,0,s,s);weather(g,s,1,{chips:.3,rust:.9,dust:.7})}),roughness:.5,metalness:.5}),
   tread:new THREE.MeshStandardMaterial({color:0x1d1b19,roughness:.95}),
   fuel:new THREE.MeshStandardMaterial({color:0xc85a14,roughness:.6,metalness:.3}),
   lens:new THREE.MeshBasicMaterial({color:new THREE.Color(0xff3050).multiplyScalar(2.5)}),
@@ -799,14 +800,36 @@ function blocked(x,z,r){for(const c of colliders){if(c.minY>6)continue;const cx=
 
 // ================= MECH BUILD =================
 const patCache={};
-function patternTex(pat,c1,c2){const key=pat+c1+c2;if(patCache[key])return patCache[key];
-  const t=canvasTex(128,(g,s)=>{g.fillStyle=c1;g.fillRect(0,0,s,s);const dk=new THREE.Color(c1).multiplyScalar(.6).getStyle();
+function weather(g,s,wear,opt={}){const k=s/128;
+  // grime base + fine specks
+  specks(g,s,900*k*k,2*k,.3,.12+wear*.04);
+  if(wear>0){
+    // chipped paint showing bare metal
+    const chips=(wear===2?70:28)*(opt.chips||1);for(let i=0;i<chips;i++){const x=Math.random()*s,y=Math.random()*s,r=rand(1,wear===2?5:3.5)*k;g.fillStyle='rgba(40,30,22,.55)';g.beginPath();for(let a=0;a<6.28;a+=.9){const rr=r*rand(.7,1.4);g.lineTo(x+Math.cos(a)*rr+.8*k,y+Math.sin(a)*rr+.8*k)}g.fill();
+      g.fillStyle='rgba('+(140+rand(-15,15)|0)+','+(134+rand(-15,15)|0)+','+(124+rand(-12,12)|0)+',.85)';g.beginPath();for(let a=0;a<6.28;a+=.9){const rr=r*rand(.6,1.2);g.lineTo(x+Math.cos(a)*rr,y+Math.sin(a)*rr)}g.fill()}
+    // rust blooms
+    const rust=(wear===2?16:7)*(opt.rust||1);for(let i=0;i<rust;i++){const x=Math.random()*s,y=s*rand(.15,1),R0=rand(4,wear===2?15:10)*k;
+      for(let j=0;j<6;j++){const px=x+rand(-R0,R0),py=y+rand(-R0*.6,R0*.6),pr=R0*rand(.35,.8);const gr=g.createRadialGradient(px,py,0,px,py,pr);gr.addColorStop(0,'rgba(92,40,14,.75)');gr.addColorStop(.55,'rgba(150,70,24,.5)');gr.addColorStop(1,'rgba(150,70,24,0)');g.fillStyle=gr;g.fillRect(px-pr,py-pr,pr*2,pr*2)}
+      for(let j=0;j<14;j++){g.fillStyle='rgba(200,105,40,'+rand(.3,.7)+')';g.fillRect(x+rand(-R0,R0),y+rand(-R0*.6,R0*.6),rand(1,2.5)*k,rand(1,2.5)*k)}}
+    // rust drips running down
+    const drips=(wear===2?26:11)*(opt.rust||1);for(let i=0;i<drips;i++){const x=Math.random()*s,y=Math.random()*s*.75,len=rand(10,45)*k;const gr=g.createLinearGradient(0,y,0,y+len);gr.addColorStop(0,'rgba(120,52,18,.6)');gr.addColorStop(1,'rgba(120,52,18,0)');g.fillStyle=gr;g.fillRect(x,y,rand(1,2.6)*k,len)}
+    // scratches
+    g.lineCap='round';for(let i=0;i<(wear===2?30:12);i++){const x=Math.random()*s,y=Math.random()*s,a=rand(-.6,.6),l=rand(6,26)*k;g.strokeStyle='rgba(205,200,190,'+rand(.15,.4)+')';g.lineWidth=rand(.6,1.4)*k;g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l);g.stroke()}
+    // scorch marks (battle-scarred)
+    if(wear===2)for(let i=0;i<4;i++){const x=Math.random()*s,y=Math.random()*s,r=rand(8,20)*k;const gr=g.createRadialGradient(x,y,0,x,y,r);gr.addColorStop(0,'rgba(12,10,8,.7)');gr.addColorStop(1,'rgba(12,10,8,0)');g.fillStyle=gr;g.fillRect(x-r,y-r,r*2,r*2)}}
+  // dust caked toward the bottom, lighter film on top edges
+  const dA=[.18,.42,.55][wear]*(opt.dust||1);let gr=g.createLinearGradient(0,s*.45,0,s);gr.addColorStop(0,'rgba(178,142,98,0)');gr.addColorStop(1,'rgba(178,142,98,'+dA+')');g.fillStyle=gr;g.fillRect(0,s*.45,s,s*.55);
+  gr=g.createLinearGradient(0,0,0,s*.14);gr.addColorStop(0,'rgba(190,156,112,'+(dA*.55)+')');gr.addColorStop(1,'rgba(190,156,112,0)');g.fillStyle=gr;g.fillRect(0,0,s,s*.14);
+  for(let i=0;i<(300+wear*500)*k*k;i++){const y=s*Math.pow(Math.random(),.45);g.fillStyle='rgba(185,150,105,'+rand(.1,.35)*(.5+wear*.35)+')';g.fillRect(Math.random()*s,y,rand(1,2.5)*k,rand(1,2)*k)}
+  for(let i=0;i<(wear*6);i++){const x=Math.random()*s,y=s*rand(.55,1),r=rand(6,16)*k;const gr2=g.createRadialGradient(x,y,0,x,y,r);gr2.addColorStop(0,'rgba(150,118,80,.35)');gr2.addColorStop(1,'rgba(150,118,80,0)');g.fillStyle=gr2;g.fillRect(x-r,y-r,r*2,r*2)}}
+function accentTex(c2,wear){const key='acc'+c2+wear;if(patCache[key])return patCache[key];return patCache[key]=canvasTex(128,(g,s)=>{g.fillStyle=c2;g.fillRect(0,0,s,s);weather(g,s,wear,{rust:.6,chips:1.3,dust:.8})})}
+function patternTex(pat,c1,c2,wear=1){const key=pat+c1+c2+'w'+wear;if(patCache[key])return patCache[key];
+  const t=canvasTex(256,(g,s)=>{g.save();g.scale(2,2);s=128;g.fillStyle=c1;g.fillRect(0,0,s,s);const dk=new THREE.Color(c1).multiplyScalar(.6).getStyle();
     if(pat==='stripes'){g.fillStyle=c2;for(let i=-s;i<s*2;i+=42){g.beginPath();g.moveTo(i,0);g.lineTo(i+14,0);g.lineTo(i+14-s,s);g.lineTo(i-s,s);g.fill()}}
     else if(pat==='camo'){for(let i=0;i<26;i++){g.fillStyle=i%2?c2:dk;g.globalAlpha=i%2?.75:.9;g.beginPath();g.ellipse(Math.random()*s,Math.random()*s,rand(8,22),rand(5,14),Math.random()*3,0,7);g.fill()}g.globalAlpha=1}
     else if(pat==='hazard'){g.fillStyle='#161412';g.fillRect(0,s*.62,s,s*.38);g.fillStyle=c2;for(let i=-s;i<s*2;i+=24){g.beginPath();g.moveTo(i,s*.62);g.lineTo(i+12,s*.62);g.lineTo(i+12-s*.38,s);g.lineTo(i-s*.38,s);g.fill()}}
     else if(pat==='digital'){for(let i=0;i<120;i++){g.fillStyle=Math.random()<.5?c2:dk;g.globalAlpha=.85;const q=8;g.fillRect((Math.random()*16|0)*q,(Math.random()*16|0)*q,q*(1+(Math.random()*2|0)),q)}g.globalAlpha=1}
-    specks(g,s,900,2,.35,.14);g.strokeStyle='rgba(255,255,255,.14)';for(let i=0;i<14;i++){g.lineWidth=.7;g.beginPath();const x=Math.random()*s,y=Math.random()*s;g.moveTo(x,y);g.lineTo(x+rand(-12,12),y+rand(-6,6));g.stroke()}
-    const gr=g.createLinearGradient(0,0,0,s);gr.addColorStop(0,'rgba(0,0,0,0)');gr.addColorStop(1,'rgba(60,35,15,.35)');g.fillStyle=gr;g.fillRect(0,0,s,s)});
+    g.restore();weather(g,256,wear)});
   return patCache[key]=t}
 function part(geo,mat,sx,sy,sz,x,y,z,parent){const m=new THREE.Mesh(geo===BOXG?BEVG:geo,mat);m.scale.set(sx,sy,sz);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m}
 function weaponMesh(w,A,rig){const D=MAT.mechDark,M=MAT.metal,P=rig.paint;let z=3;
@@ -854,8 +877,8 @@ function moduleMesh(mod,T,rig){const D=MAT.mechDark,P=rig.paint,Gl=rig.glow;
   else if(mod==='emp'){part(CYLG,D,.5,1.7,.5,0,2.35,-.95,T);for(const y of[1.9,2.35,2.8])part(CYLG,Gl,.8,.08,.8,0,y,-.95,T).castShadow=false;part(SPHG,Gl,.45,.45,.45,0,3.3,-.95,T)}
 }
 function buildMech(c){const ch=CHASSIS[c.ch],s=ch.scale;
-  const paint=new THREE.MeshStandardMaterial({map:patternTex(c.pat,c.c1,c.c2),roughness:.62,metalness:.35});
-  const accent=new THREE.MeshStandardMaterial({color:c.c2,roughness:.5,metalness:.4});
+  const wear=c.wear==null?1:c.wear;const paint=new THREE.MeshStandardMaterial({map:patternTex(c.pat,c.c1,c.c2,wear),roughness:.62+wear*.06,metalness:.35-wear*.05});
+  const accent=new THREE.MeshStandardMaterial({map:accentTex(c.c2,wear),roughness:.52+wear*.06,metalness:.4-wear*.05});
   const glow=new THREE.MeshBasicMaterial({color:new THREE.Color(c.c2).lerp(new THREE.Color(0xffffff),.45).multiplyScalar(2.2)});paint.normalMap=PANEL_N;paint.normalScale=new THREE.Vector2(.75,.75);accent.normalMap=PANEL_N;accent.normalScale=new THREE.Vector2(.5,.5);
   const D=MAT.mechDark,M=MAT.metal,CH=MAT.chrome;const g=new THREE.Group();const inner=new THREE.Group();inner.scale.setScalar(s);g.add(inner);const legs=new THREE.Group();inner.add(legs);
   const rig={group:g,inner,legs,legParts:[],type:ch.legs,paint,accent,glow,arms:[],muzzles:[],armBase:[],spinners:[],pads:[]};let hipY;
@@ -1186,7 +1209,7 @@ function updateCamera(dt){const m=G.me;let tgt;
 
 // ================= BOTS =================
 function makeBot(over){const ARMS=Object.keys(WEAPONS).filter(isArm),RANGED=ARMS.filter(k=>!WEAPONS[k].melee),BACKS=Object.keys(WEAPONS).filter(k=>WEAPONS[k].back&&k!=='doom');const c={ch:pick(Object.keys(CHASSIS)),wl:pick(ARMS),wr:pick(RANGED),wb:Math.random()<.3?pick(BACKS):'none',mod:pick(Object.keys(MODULES)),
-    c1:pick(['#6a3a2a','#4a4038','#7a5a3a','#3a3a3a','#5a2a2a','#5a5040']),c2:pick(['#d23a2a','#ffd400','#e06020','#c0c0c0','#ff3060']),pat:pick(PATS)};if(over)Object.assign(c,over);
+    c1:pick(['#6a3a2a','#4a4038','#7a5a3a','#3a3a3a','#5a2a2a','#5a5040']),c2:pick(['#d23a2a','#ffd400','#e06020','#c0c0c0','#ff3060']),pat:pick(PATS),wear:Math.random()<.6?2:1};if(over)Object.assign(c,over);
   const used=new Set(G.bots.map(b=>b.name));const nm=BOT_NAMES.filter(n=>!used.has(n));const b=new Mech(c,'bot',pick(nm.length?nm:BOT_NAMES));
   b.brain={think:0,target:null,strafe:Math.random()<.5?1:-1,los:false,wp:null,stuckT:0,aggro:null,rnd:0};return b}
 function weaponRange(w,s=1){const W=WEAPONS[w];if(!W)return 0;return W.melee?W.reach*s+2:W.range||100}
@@ -1247,6 +1270,7 @@ function animateMech(m,dt){const r=m.rig;if(!r.group.visible){if(m.blob)m.blob.v
   else if(r.type==='tread'){r.torso.position.y=r.torsoY+Math.sin(G.time*30)*.03*amt;r.legs.rotation.x=Math.sin(G.time*20)*.008*amt}
   for(let i=0;i<2;i++){const A=r.arms[i];const w=WEAPONS[i?m.cfg.wr:m.cfg.wl];m.swing[i]=Math.max(0,m.swing[i]-dt*(w.melee?3.2:8));const sw=w.melee?Math.sin(m.swing[i]*Math.PI):0;
     A.rotation.x=-m.aimPitch-sw*(m.cfg[i?'wr':'wl']==='hammer'?1.5:.7);A.rotation.y=w.melee&&m.cfg[i?'wr':'wl']==='blade'?(i?1:-1)*sw*.9:0;A.position.z+=(0-A.position.z)*Math.min(1,dt*10)}
+  {const df=1-clamp(m.hp/m.maxHp,0,1);if(Math.abs((r._df||0)-df)>.02){r._df=df;r.paint.color.setRGB(1-df*.45,1-df*.5,1-df*.52);r.accent.color.setRGB(1-df*.4,1-df*.45,1-df*.48)}}
   if(r.blink)r.blink.visible=((G.time*1.3+m.pos.x*.1)%1)<.5;if(r.treadTex){const fv=m.vel.x*Math.sin(m.legsYaw)+m.vel.z*Math.cos(m.legsYaw);r.treadTex.offset.y-=fv*dt*.16}
   if(r.back){r.back.rotation.x=-m.aimPitch*.9;r.back.position.z+=(-.55-r.back.position.z)*Math.min(1,dt*8)}
   for(const sp of r.spinners){const act=sp===r.gat?m.cd[2]>0:(m.cd[0]>0||m.cd[1]>0);const v=dt*(act?28:sp===r.gat?3:8);if(sp===r.gat||sp.userData.ax==='z')sp.rotation.z+=v;else sp.rotation.x+=v}
@@ -1458,6 +1482,7 @@ function renderGarage(){
   const sw=(id,list,key)=>{const el=$(id);el.innerHTML='';list.forEach(c=>{const s=document.createElement('div');s.className='sw'+(cfg[key]===c?' sel':'');s.style.background=c;s.onclick=()=>{cfg[key]=c;save();renderGarage();rebuildPreview();sfx('click')};el.appendChild(s)})};
   sw('#sw1',C1S,'c1');sw('#sw2',C2S,'c2');
   const pe=$('#pats');pe.innerHTML='';PATS.forEach(p=>{const b=document.createElement('button');b.className='btn'+(cfg.pat===p?' sel':'');b.textContent=p.toUpperCase();b.onclick=()=>{cfg.pat=p;save();renderGarage();rebuildPreview();sfx('click')};pe.appendChild(b)});
+  const we=$('#wears');we.innerHTML='';[[0,'FACTORY FRESH'],[1,'DUSTY & WORN'],[2,'RUSTED VETERAN']].forEach(([k,l])=>{const b=document.createElement('button');b.className='btn'+((cfg.wear==null?1:cfg.wear)===k?' sel':'');b.textContent=l;b.onclick=()=>{cfg.wear=k;save();renderGarage();rebuildPreview();sfx('click')};we.appendChild(b)});
   $('#scrapBox').innerHTML='⚙ '+scrap+' SCRAP<small>Sector '+settings.sector+' pays ×'+SECT[settings.sector].mult+' scrap · Kills · Salvage · Supply drops · Streaks</small>';
   const ch=CHASSIS[cfg.ch],wl=WEAPONS[cfg.wl],wr=WEAPONS[cfg.wr];const wbw=WEAPONS[cfg.wb];const fp=dps(cfg.wl)+dps(cfg.wr)+(wbw?dps(cfg.wb):0);const hg=wl.heat*wl.rate+wr.heat*wr.rate+(wbw?wbw.heat*wbw.rate:0);const eff=clamp(ch.cool/hg,0,1.5);
   const st=[['ARMOR',ch.hp,ch.hp/265],['SPEED',ch.speed,ch.speed/17],['FIREPOWER',fp+' dps',fp/170],['HEAT BALANCE',Math.round(eff*100)+'%',eff/1.2]];
