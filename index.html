@@ -269,13 +269,14 @@ const WEAPONS={
   flak:{name:'Flak Battery',back:1,rate:1.2,dmg:16,splash:6,prox:5,pellets:2,speed:120,spread:.04,heat:9,life:1.4,size:.4,color:0xffc070,cost:250,snd:'shot',range:150},
   cluster:{name:'Cluster Mortar',back:1,rate:.3,dmg:20,splash:5,speed:62,grav:24,heat:22,life:6,size:.9,round:1,color:0xff7040,cluster:6,cost:350,snd:'howitzer',range:170},
   doom:{name:'Doomsday Rocket',back:1,rate:.07,dmg:95,splash:24,speed:34,heat:40,spread:0,life:8,size:1.3,trail:1,color:0xff3020,cost:500,snd:'doom',range:240},
+  singularity:{name:'Singularity Projector',rate:.25,dmg:34,splash:9,push:2.6,speed:20,heat:32,spread:0,life:3.4,blackhole:1,pullR:17,coreR:6,color:0x8a40ff,cost:450,snd:'singularity',range:75},
   bomblet:{name:'Bomblet',hidden:1,dmg:14,splash:5,grav:26,life:4,size:.4,round:1,color:0xff9040},
   ram:{name:'Ramming',hidden:1},
   missile:{name:'Hunter Missile',hidden:1,dmg:14,splash:4.5,speed:50,life:4.5,size:.32,color:0xffdd88,trail:1,homing:3.2,spread:.35,pellets:4,heat:0,snd:'missile'},
   emp:{name:'EMP',hidden:1,snd:'emp'}
 };
-const WTYPE={};[['BALLISTIC','ac smg shotgun gatling ripper harpoon'],['ENERGY','laser rail tesla leech lance plasma'],['EXPLOSIVE','rocket grenade swarm howitzer flak cluster mines doom'],['CHEMICAL','flamer cryo acid'],['MELEE','saw claw hammer blade drill shock']].forEach(([t,l])=>l.split(' ').forEach(k=>WTYPE[k]=t));
-const WDESC={tesla:'chains to 3 nearby',leech:'heals you',cryo:'slows target',acid:'burns over time',grenade:'bouncing fuse',ripper:'ricochets off walls',harpoon:'pulls target in',drill:'ignores shields',shock:'jams + overheats',mines:'proximity mines',flak:'airburst near mechs',cluster:'splits into bomblets',doom:'one huge blast',gatling:'bullet hose',swarm:'6-rocket volley',howitzer:'arcing heavy shell',lance:'long beam',saw:'shreds',claw:'jams',hammer:'knockback',blade:'lunge',rail:'pierces',plasma:'arcing AoE',rocket:'AoE',flamer:'short range burn',shotgun:'close range',smg:'fast & cheap'};
+const WTYPE={};[['BALLISTIC','ac smg shotgun gatling ripper harpoon'],['ENERGY','laser rail tesla leech lance plasma'],['EXPLOSIVE','rocket grenade swarm howitzer flak cluster mines doom'],['CHEMICAL','flamer cryo acid'],['MELEE','saw claw hammer blade drill shock'],['EXOTIC','singularity']].forEach(([t,l])=>l.split(' ').forEach(k=>WTYPE[k]=t));
+const WDESC={singularity:'mini black hole: pulls, eats shots, implodes',tesla:'chains to 3 nearby',leech:'heals you',cryo:'slows target',acid:'burns over time',grenade:'bouncing fuse',ripper:'ricochets off walls',harpoon:'pulls target in',drill:'ignores shields',shock:'jams + overheats',mines:'proximity mines',flak:'airburst near mechs',cluster:'splits into bomblets',doom:'one huge blast',gatling:'bullet hose',swarm:'6-rocket volley',howitzer:'arcing heavy shell',lance:'long beam',saw:'shreds',claw:'jams',hammer:'knockback',blade:'lunge',rail:'pierces',plasma:'arcing AoE',rocket:'AoE',flamer:'short range burn',shotgun:'close range',smg:'fast & cheap'};
 const MODULES={
   shield:{name:'Bulwark Shield',cd:12,dur:3.5,cost:0,desc:'−75% damage for 3.5s'},
   jets:{name:'Jetpack',cd:3,cost:0,desc:'Big leap, hold SPACE to fly'},
@@ -352,6 +353,7 @@ const MAT={
   lens:new THREE.MeshBasicMaterial({color:new THREE.Color(0xff3050).multiplyScalar(2.5)}),
   plasmaG:new THREE.MeshBasicMaterial({color:new THREE.Color(0x7affb0).multiplyScalar(2.2)}),
   railG:new THREE.MeshBasicMaterial({color:new THREE.Color(0x7adfff).multiplyScalar(2.2)}),
+  voidG:new THREE.MeshBasicMaterial({color:new THREE.Color(0xa060ff).multiplyScalar(2.4)}),voidCore:new THREE.MeshBasicMaterial({color:0x000000}),
   bladeG:new THREE.MeshBasicMaterial({color:new THREE.Color(0x9ff0ff).multiplyScalar(2.6)}),
   teslaG:new THREE.MeshBasicMaterial({color:new THREE.Color(0xbfe8ff).multiplyScalar(2.2)}),leechG:new THREE.MeshBasicMaterial({color:new THREE.Color(0x7aff8a).multiplyScalar(2.2)}),acidT:new THREE.MeshStandardMaterial({color:0x5fbf2a,roughness:.5}),cryoT:new THREE.MeshStandardMaterial({color:0x8fd8f0,roughness:.4,metalness:.3}),doomR:new THREE.MeshStandardMaterial({color:0xb02018,roughness:.5,metalness:.3}),
   lanceG:new THREE.MeshBasicMaterial({color:0xd890ff}),
@@ -457,6 +459,8 @@ function sfx(type,pos,vol=1){if(!AC||sndCount>14)return;let g=vol;if(pos){const 
     case 'disc':tn(t,900,1400,.25,'triangle',g*.12);nz(t,.15,2500,2,g*.25);break;
     case 'harpoon':tn(t,400,90,.2,'sawtooth',g*.15);nz(t,.2,1500,1,g*.3);break;
     case 'drill':nz(t,.12,1800,4,g*.3);tn(t,240,260,.12,'square',g*.06);break;
+    case 'singularity':tn(t,90,38,1.3,'sine',g*.6);tn(t,420,60,.9,'sawtooth',g*.08);nz(t,.8,180,.5,g*.4,'lowpass');break;
+    case 'implode':tn(t,30,260,.35,'sine',g*.5);tn(t+.33,70,22,1.2,'sine',g*.9);nz(t+.33,1.3,350,.5,g*1.3,'lowpass');nz(t,.35,1800,1,g*.25,'highpass');break;
     case 'doom':nz(t,1.2,400,.6,g*.8,'lowpass');tn(t,60,120,1,'sawtooth',g*.15);break;
     case 'boom':nz(t,1.2,420,.5,g*1.3,'lowpass');tn(t,95,28,.9,'sine',g*.8);break;
     case 'big':nz(t,2,300,.4,g*1.6,'lowpass');tn(t,70,20,1.6,'sine',g*1);nz(t,.6,2000,.6,g*.4);break;
@@ -853,6 +857,8 @@ function weaponMesh(w,A,rig){const D=MAT.mechDark,M=MAT.metal,P=rig.paint;let z=
     case 'grenade':part(BOXG,D,.9,.9,1.1,0,-.1,.9,A);const dr=part(CYLG,P,1.1,.8,1.1,0,-.1,1.4,A);dr.rotation.z=Math.PI/2;bar(.5,1.2,0,-.1,1.8,M);z=3.0;break;
     case 'ripper':part(BOXG,D,1.2,.5,1.6,0,-.1,1.2,A);part(CYLG,M,1.2,.1,1.2,0,.2,1.4,A);part(BOXG,P,1.3,.15,.4,0,.25,2.0,A);z=2.2;break;
     case 'harpoon':part(BOXG,D,.7,.7,1.3,0,-.1,1.0,A);bar(.25,2.2,0,-.1,1.6,M);const hp=part(CONEG,MAT.metal,.45,.8,.45,0,-.1,4.1,A);hp.rotation.x=Math.PI/2;part(CYLG,P,.5,.5,.5,0,-.6,1.0,A);z=4.4;break;
+    case 'singularity':{part(BOXG,D,.95,.95,1.5,0,-.1,1.0,A);for(let i=0;i<3;i++){const rg=part(CYLG,MAT.voidG,1.0-i*.08,.1,1.0-i*.08,0,-.1,1.25+i*.42,A);rg.rotation.x=Math.PI/2;rg.castShadow=false}
+      for(const a of[0,2.09,4.19]){const pr=part(BOXG,M,.12,.12,1.5,Math.cos(a)*.42,-.1+Math.sin(a)*.42,2.9,A);pr.rotation.z=a}part(SPHG,MAT.voidCore,.55,.55,.55,0,-.1,3.25,A);z=3.6;break}
     case 'drill':{part(BOXG,D,.8,.8,1.3,0,-.1,1.0,A);const dg=new THREE.Group();dg.position.set(0,-.1,1.8);dg.userData.ax='z';A.add(dg);const cn=part(CONEG,MAT.metal,1.1,3.0,1.1,0,0,1.5,dg);cn.rotation.x=Math.PI/2;for(let i=0;i<3;i++){const f=part(BOXG,rig.accent,.12,.12,2.6,Math.cos(i*2.1)*.35,Math.sin(i*2.1)*.35,1.3,dg);f.rotation.z=i*2.1}rig.spinners.push(dg);z=4.6;break}
     case 'shock':part(BOXG,D,.8,.8,1.2,0,-.1,1.0,A);part(BOXG,P,1.3,1.2,1.2,0,-.1,2.1,A);for(let i=0;i<3;i++)bar(.9,.1,0,-.1,1.6+i*.35,MAT.teslaG);for(const x of[-.4,0,.4])part(BOXG,M,.28,.3,.5,x,.2,2.9,A);z=3.0;break;
     case 'rail':part(BOXG,D,.62,.62,1.4,0,-.1,1.0,A);part(BOXG,M,.14,.22,3.0,-.19,-.1,2.7,A);part(BOXG,M,.14,.22,3.0,.19,-.1,2.7,A);for(let i=0;i<3;i++)part(BOXG,MAT.railG,.62,.32,.12,0,-.1,1.9+i*.65,A);z=4.2;break;
@@ -1031,7 +1037,18 @@ function doBeam(owner,src,wk,o,d){const W=WEAPONS[wk];const range=W.range;
   if(wk==='rail'||wk==='lance'){for(let k=0;k<end;k+=2.2){const p=tmpB.copy(o).addScaledVector(d,k);PN.emit(p.x,p.y,p.z,rand(-.3,.3),rand(0,.6),rand(-.3,.3),COL.smokeL,.6,rand(.8,1.4),2,1,0,.35)}}}
 const BEAMG=new THREE.CylinderGeometry(.5,.5,1,8,1,true);
 function beamFx(a,b,color,w,life){const len=a.distanceTo(b);if(len<.1)return;const mk=(c,ww,op)=>{const m=new THREE.Mesh(BEAMG,new THREE.MeshBasicMaterial({color:new THREE.Color(c).multiplyScalar(3),transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false}));m.scale.set(ww,len,ww);m.position.copy(a).add(b).multiplyScalar(.5);m.quaternion.setFromUnitVectors(UP,tmpD.copy(b).sub(a).normalize());scene.add(m);G.beams.push({m,life,max:life,w:ww})};mk(color,w,.9);mk(0xffffff,w*.35,1)}
-function projMesh(W){if(W.flame)return null;let mesh;if(W.disc){mesh=new THREE.Mesh(CYLG,projMat(W.color));mesh.scale.set(W.size,.12,W.size)}else{mesh=new THREE.Mesh(W.round?SPHG:BOXG,projMat(W.color));const sz=W.size||.25;mesh.scale.set(sz,sz,W.round?sz:sz*(W.trail?4:6))}scene.add(mesh);return mesh}
+const BH_DISK=canvasTex(128,(g,s)=>{g.clearRect(0,0,s,s);const gr=g.createRadialGradient(s/2,s/2,s*.16,s/2,s/2,s/2);gr.addColorStop(0,'rgba(255,240,220,1)');gr.addColorStop(.18,'rgba(255,170,90,.95)');gr.addColorStop(.45,'rgba(170,80,255,.75)');gr.addColorStop(.75,'rgba(80,30,180,.3)');gr.addColorStop(1,'rgba(40,10,90,0)');g.fillStyle=gr;g.fillRect(0,0,s,s);
+  g.globalCompositeOperation='destination-out';for(let i=0;i<40;i++){g.strokeStyle='rgba(0,0,0,'+rand(.1,.4)+')';g.lineWidth=rand(1,3);g.beginPath();g.arc(s/2,s/2,rand(s*.2,s*.48),rand(0,6),rand(0,6)+rand(.5,2));g.stroke()}});
+const BH_SHADOW=canvasTex(128,(g,s)=>{g.clearRect(0,0,s,s);const gr=g.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);gr.addColorStop(0,'rgba(0,0,0,1)');gr.addColorStop(.42,'rgba(0,0,0,1)');gr.addColorStop(.6,'rgba(10,0,25,.6)');gr.addColorStop(1,'rgba(10,0,25,0)');g.fillStyle=gr;g.fillRect(0,0,s,s)});
+const BH_RING=canvasTex(128,(g,s)=>{g.clearRect(0,0,s,s);const gr=g.createRadialGradient(s/2,s/2,s*.28,s/2,s/2,s*.5);gr.addColorStop(0,'rgba(255,230,200,0)');gr.addColorStop(.12,'rgba(255,245,230,1)');gr.addColorStop(.3,'rgba(255,170,90,.7)');gr.addColorStop(.6,'rgba(160,80,255,.35)');gr.addColorStop(1,'rgba(120,60,255,0)');g.fillStyle=gr;g.fillRect(0,0,s,s)});
+function blackHoleMesh(){const g=new THREE.Group();const core=new THREE.Mesh(SPHG,MAT.voidCore);core.scale.setScalar(2);g.add(core);
+  const sh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:BH_SHADOW,transparent:true,depthWrite:false,color:0x000000,opacity:.95}));sh.scale.setScalar(8.5);sh.renderOrder=4;g.add(sh);
+  const pr=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:BH_RING,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,color:new THREE.Color(1,1,1).multiplyScalar(2)}));pr.scale.setScalar(6);pr.renderOrder=5;g.add(pr);g.userData.bb=[sh,pr];
+  const dm=new THREE.MeshBasicMaterial({map:BH_DISK,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,color:new THREE.Color(1,1,1).multiplyScalar(1.8)});
+  const disk=new THREE.Mesh(new THREE.PlaneGeometry(1,1),dm);disk.scale.setScalar(9.5);disk.rotation.x=-Math.PI/2+.35;g.add(disk);const d2=new THREE.Mesh(disk.geometry,dm);d2.scale.setScalar(4.2);d2.rotation.x=.4;g.add(d2);
+  const halo=new THREE.Mesh(SPHG,new THREE.MeshBasicMaterial({color:0x6a30d0,transparent:true,opacity:.18,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.BackSide}));halo.scale.setScalar(4.5);g.add(halo);
+  g.userData.disk=disk;g.userData.d2=d2;g.userData.core=core;return g}
+function projMesh(W){if(W.flame)return null;if(W.blackhole){const g=blackHoleMesh();scene.add(g);return g}let mesh;if(W.disc){mesh=new THREE.Mesh(CYLG,projMat(W.color));mesh.scale.set(W.size,.12,W.size)}else{mesh=new THREE.Mesh(W.round?SPHG:BOXG,projMat(W.color));const sz=W.size||.25;mesh.scale.set(sz,sz,W.round?sz:sz*(W.trail?4:6))}scene.add(mesh);return mesh}
 function spawnProj(owner,src,wk,o,d,tg,i,seed){const W=WEAPONS[wk];const mesh=projMesh(W);if(mesh)mesh.position.copy(o);
   G.projs.push({owner,src,wk,W,pos:o.clone(),vel:d.clone().multiplyScalar(W.speed*(W.homing?.6:1)),life:W.life+(W.homing?i*.05:0),mesh,tg,age:0,bounces:W.ricochet||0,seed:seed||1,split:false})}
 function applyFx(m,W,owner){if(!m.alive||!W)return;const ox=owner?owner.pos.x:m.pos.x,oz=owner?owner.pos.z:m.pos.z;let dx=m.pos.x-ox,dz=m.pos.z-oz;const d=Math.hypot(dx,dz)||1;dx/=d;dz/=d;
@@ -1053,27 +1070,30 @@ function damage(m,dmg,attacker,wk,quiet){if(!m.alive||m.spawnProt>0)return false
   if(m.kind==='me'&&!quiet){G.shake+=Math.min(.22,dmg/120);sfx('hurt',null,.7);hurtFx(dmg);if(attacker)dmgDir(attacker.pos)}
   if(m.kind==='bot'&&attacker)m.brain.aggro=attacker;
   if(m.hp<=0){kill(m,attacker,wk);return true}return false}
-function explodeAt(pos,W,owner,src,wk){explosion(pos,W.splash,wk==='plasma'?COL.plasma:wk==='acid'?COL.acid:null);sfx(wk==='doom'?'big':'boom',pos,Math.min(1.6,W.splash/8));if(wk==='doom')explosion(tmpB.copy(pos).setY(pos.y+5),18);
+function explodeAt(pos,W,owner,src,wk){explosion(pos,W.splash,wk==='plasma'?COL.plasma:wk==='acid'?COL.acid:wk==='singularity'?new THREE.Color(.6,.3,1):null);sfx(wk==='doom'?'big':'boom',pos,Math.min(1.6,W.splash/8));if(wk==='doom')explosion(tmpB.copy(pos).setY(pos.y+5),18);
   for(const m of G.mechs){if(!canHit(src,owner,m))continue;const dx=Math.max(0,Math.hypot(pos.x-m.pos.x,pos.z-m.pos.z)-m.R);const dy=pos.y<m.pos.y?m.pos.y-pos.y:pos.y>m.pos.y+m.H?pos.y-m.pos.y-m.H:0;const d=Math.hypot(dx,dy);
-    if(d<W.splash){if(m.kind!=='remote'&&!(src==='remote'&&m.kind==='bot')&&m.alive){const k=(1-d/W.splash)*Math.min(30,W.dmg*.35)/(m.mass||1);const hx=m.pos.x-pos.x,hz=m.pos.z-pos.z,hl=Math.hypot(hx,hz)||1;m.vel.x+=hx/hl*k;m.vel.z+=hz/hl*k;m.vel.y+=k*.4;if(k>3)m.onGround=false;stagger(m,k*1.6,hx,hz)}hitMech(m,W.dmg*(1-.6*d/W.splash),owner,src,m.torsoPos(new V3()),wk)}}}
+    if(d<W.splash){if(m.kind!=='remote'&&!(src==='remote'&&m.kind==='bot')&&m.alive){const k=(1-d/W.splash)*Math.min(30*(W.push||1),W.dmg*.35*(W.push||1))/(m.mass||1);const hx=m.pos.x-pos.x,hz=m.pos.z-pos.z,hl=Math.hypot(hx,hz)||1;m.vel.x+=hx/hl*k;m.vel.z+=hz/hl*k;m.vel.y+=k*.4;if(k>3)m.onGround=false;stagger(m,k*1.6,hx,hz)}hitMech(m,W.dmg*(1-.6*d/W.splash),owner,src,m.torsoPos(new V3()),wk)}}}
 function empBlast(owner,o){const src=owner.kind;sfx('emp',o,1);const ring=new THREE.Mesh(new THREE.RingGeometry(.8,1.2,48),MAT.emp.clone());ring.rotation.x=-Math.PI/2;ring.position.set(o.x,1,o.z);scene.add(ring);G.rings.push({m:ring,t:0});
   for(let i=0;i<40;i++){const a=Math.random()*6.28;PA.emit(o.x,1.5,o.z,Math.cos(a)*30,rand(0,4),Math.sin(a)*30,COL.blue,.5,.6,0,1,0)}flash(o,3,0x66ccff);
   for(const m of G.mechs){if(!canHit(src,owner,m))continue;if(Math.hypot(m.pos.x-o.x,m.pos.z-o.z)<18){if(m.kind==='remote'){if(src==='me')hitMarker(false);continue}damage(m,12,owner,'emp');if(m.alive){m.heat=m.ch.heatCap;m.overheat=2.6;m.empT=1.2;if(m.kind==='me')tip('EMP HIT — systems scrambled',1.5)}}}}
 function hitNormal(p,hit){if(hit.type!=='obs'||!hit.box)return new V3(0,1,0);const b=hit.box;const f=[[Math.abs(p.x-b.minX),-1,0,0],[Math.abs(p.x-b.maxX),1,0,0],[Math.abs(p.y-b.minY),0,-1,0],[Math.abs(p.y-b.maxY),0,1,0],[Math.abs(p.z-b.minZ),0,0,-1],[Math.abs(p.z-b.maxZ),0,0,1]];f.sort((a,c)=>a[0]-c[0]);return new V3(f[0][1],f[0][2],f[0][3])}
 function spawnBomblet(p,v){const W=WEAPONS.bomblet;const mesh=projMesh(W);mesh.position.copy(p.pos);G.projs.push({owner:p.owner,src:p.src,wk:'bomblet',W,pos:p.pos.clone(),vel:v,life:W.life,mesh,age:0,bounces:0,seed:1})}
 function updateProjs(dt){const P=G.projs;
-  for(let i=P.length-1;i>=0;i--){const p=P[i];p.age+=dt;const W=p.W;
+  for(let i=P.length-1;i>=0;i--){const p=P[i];if(p.dead){killProj(i);continue}p.age+=dt;const W=p.W;
+    if(W.blackhole){blackHoleTick(p,dt);if(p.stuck){p.life-=dt;bhVisual(p,dt);if(p.life<=0){implode(p);killProj(i)}continue}}
     if(W.homing){if(p.age>.25){const t=p.tgM;if(t&&t.alive&&!t.hidden){const want=t.torsoPos(tmpB).sub(p.pos).normalize().multiplyScalar(W.speed);p.vel.lerp(want,Math.min(1,W.homing*dt))}p.vel.setLength(Math.min(W.speed,p.vel.length()+60*dt))}}
     if(W.grav)p.vel.y-=W.grav*dt;
     if(W.cluster&&!p.split&&p.vel.y<0&&p.age>.3){p.split=true;const r=mulberry(p.seed);for(let k=0;k<W.cluster;k++)spawnBomblet(p,new V3(p.vel.x*.6+(r()-.5)*16,r()*5,p.vel.z*.6+(r()-.5)*16));sfx('thunk',p.pos,.7);sparks(p.pos,12);killProj(i);continue}
     if(W.prox&&p.age>.15){let near=false;for(const m of G.mechs){if(!canHit(p.src,p.owner,m))continue;if(Math.hypot(m.pos.x-p.pos.x,m.pos.z-p.pos.z)<W.prox+m.R&&p.pos.y>m.pos.y-1&&p.pos.y<m.pos.y+m.H+W.prox){near=true;break}}if(near){explodeAt(p.pos,W,p.owner,p.src,p.wk);killProj(i);continue}}
     const spd=p.vel.length()||1e-3,step=spd*dt;const d=tmpD.copy(p.vel).divideScalar(spd);const rad=W.flame?.4+p.age*2:(W.size||.2)*.5;
     const hit=step>1e-4?castRay(p.pos,d,step,m=>canHit(p.src,p.owner,m),rad):null;
+    if(hit&&W.blackhole){p.pos.addScaledVector(d,Math.max(0,hit.t-1.2));p.vel.set(0,0,0);p.stuck=true;sfx('impact',p.pos,.6);continue}
     if(hit&&hit.type!=='mech'&&(W.bounce||p.bounces>0)){p.pos.addScaledVector(d,hit.t);const n=hitNormal(p.pos,hit);const vn=p.vel.dot(n);p.vel.addScaledVector(n,-2*vn);p.pos.addScaledVector(n,.08);
       if(W.bounce){p.vel.multiplyScalar(.55);if(Math.abs(vn)>5)sfx('click',p.pos,.3)}else{p.bounces--;sparks(p.pos,6);sfx('impact',p.pos,.5)}}
     else if(hit){p.pos.addScaledVector(d,hit.t);if(W.splash)explodeAt(p.pos,W,p.owner,p.src,p.wk);else{if(hit.mech)hitMech(hit.mech,W.dmg,p.owner,p.src,p.pos,p.wk);else if(!W.flame){sparks(p.pos,4);if(hit.type==='ground')puff(p.pos,2)}}killProj(i);continue}
     else p.pos.addScaledVector(d,step);
     p.life-=dt;
+    if(W.blackhole){bhVisual(p,dt);if(p.life<=0){implode(p);killProj(i)}continue}
     if(p.mesh){p.mesh.position.copy(p.pos);if(W.disc)p.mesh.rotation.y+=dt*25;else p.mesh.lookAt(tmpB.copy(p.pos).add(p.vel))}
     if(W.flame){const k=p.age/W.life;const ice=W.pcol==='ice';PA.emit(p.pos.x,p.pos.y,p.pos.z,rand(-1,1),rand(0,2),rand(-1,1),ice?(k<.3?COL.white:COL.ice):(k<.3?COL.fire2:COL.flame),.8+k*3.5,.16,.5,0,ice?1:-2,ice?.6:.9);if(Math.random()<.25)PN.emit(p.pos.x,p.pos.y,p.pos.z,0,ice?-.5:2,0,ice?COL.smokeL:COL.smoke,1.4,.8,2,1,-1,.35)}
     else if(W.trail){PN.emit(p.pos.x,p.pos.y,p.pos.z,rand(-.4,.4),rand(0,.6),rand(-.4,.4),COL.smokeL,p.wk==='doom'?2:.7,rand(.6,1.1)*(p.wk==='doom'?2:1),2.5,1,-.3,.55);PA.emit(p.pos.x,p.pos.y,p.pos.z,0,0,0,COL.fire,p.wk==='doom'?2:.7,.08)}
@@ -1088,6 +1108,20 @@ function removeMine(i){if(i<0||!G.mines[i])return;scene.remove(G.mines[i].g);G.m
 function updateMines(dt){for(let i=G.mines.length-1;i>=0;i--){const n=G.mines[i];n.arm-=dt;n.life-=dt;n.light.visible=Math.floor(G.time*(n.arm>0?2:5))%2===0;let boom=false;
     if(n.arm<=0)for(const m of G.mechs){if(!canHit(n.src,n.owner,m))continue;if(Math.hypot(m.pos.x-n.pos.x,m.pos.z-n.pos.z)<m.R+2.2&&m.pos.y-n.pos.y<2.5){boom=true;break}}
     if(boom){const mn=G.mines[i];removeMine(i);explodeAt(mn.pos.clone().setY(mn.pos.y+.5),WEAPONS.mines,mn.owner,mn.src,'mines')}else if(n.life<=0)removeMine(i)}}
+function blackHoleTick(p,dt){const W=p.W,pos=p.pos,grow=Math.min(1,p.age/.6);if(!p.stuck&&p.age>.5)p.vel.multiplyScalar(Math.pow(.22,dt));const PR=W.pullR*grow,CR=W.coreR;p.tick=(p.tick||0)-dt;const doTick=p.tick<=0;if(doTick)p.tick=.25;
+  for(const m of G.mechs){if(!canHit(p.src,p.owner,m))continue;const t=m.torsoPos(tmpB);const dx=pos.x-t.x,dy=pos.y-t.y,dz=pos.z-t.z,d=Math.hypot(dx,dy,dz)||.01;if(d>PR)continue;
+    if(m.kind!=='remote'&&!(p.src==='remote'&&m.kind==='bot')&&m.alive){const f=(1-d/PR)*(78+(d<CR?60:0))/Math.sqrt(m.mass||1)*dt;m.vel.x+=dx/d*f;m.vel.z+=dz/d*f;if(dy>0)m.vel.y+=dy/d*f*.7;if(d<PR*.7&&m.ch.legs!=='train'){m.vel.y=Math.max(m.vel.y,2.5+(1-d/PR)*4);m.onGround=false}if(d<CR&&m.kind==='me'&&!p.warned){p.warned=1;tip('SINGULARITY: get out of the pull!',1.2)}if(d<CR*.8)stagger(m,f*1.2,dx,dz)}
+    if(doTick&&d<CR)hitMech(m,W.dmg*.18*(1-d/CR*.6),p.owner,p.src,t,'singularity')}
+  for(const q of G.projs){if(q===p||q.dead||q.W.blackhole||q.src===p.src)continue;const dx=pos.x-q.pos.x,dy=pos.y-q.pos.y,dz=pos.z-q.pos.z,d=Math.hypot(dx,dy,dz);if(d>11*grow)continue;
+    if(d<1.6){q.dead=true;PA.emit(pos.x,pos.y,pos.z,0,0,0,COL.white,1.4,.2);continue}const sp=q.vel.length();q.vel.x+=dx/d*90*dt;q.vel.y+=dy/d*90*dt;q.vel.z+=dz/d*90*dt;q.vel.setLength(sp)}
+  for(const pk of G.pickups){const mp=pk.m.position;const d=mp.distanceTo(pos);if(d<PR&&d>1){mp.lerp(pos,Math.min(1,dt*1.5))}}}
+function bhVisual(p,dt){const g=p.mesh;if(!g)return;g.position.copy(p.pos);const u=g.userData,a=Math.min(1,p.age/.5),end=p.life<.5?Math.max(.05,p.life/.5):1;
+  u.disk.rotation.z+=dt*4;u.d2.rotation.z-=dt*6;for(const b of u.bb){b.quaternion.copy(camera.quaternion)}u.bb[1].scale.setScalar(6*(1+Math.sin(G.time*9)*.06));g.scale.setScalar(a*end*(1+Math.sin(G.time*20)*.03));
+  const pos=p.pos;for(let k=0;k<4;k++){const th=Math.random()*6.28,ph=rand(-.5,.5),r=rand(4,8);const ox=Math.cos(th)*r,oz=Math.sin(th)*r,oy=ph*r;const sp=rand(9,14);
+    PA.emit(pos.x+ox,pos.y+oy,pos.z+oz,(-ox/r)*sp-oz*.8,(-oy/r)*sp,(-oz/r)*sp+ox*.8,Math.random()<.5?COL.fire2:tmpC.setRGB(.6,.3,1),rand(.35,.7),r/sp*.9,0,0,0,.9)}
+  if(Math.random()<.25)PN.emit(pos.x+rand(-6,6),pos.y+rand(-2,2),pos.z+rand(-6,6),0,0,0,COL.dust,1.2,.6,-.6,0,0,.3);if(Math.random()<.08)flash(pos,1.6,0x8040ff)}
+function implode(p){const pos=p.pos.clone(),W=p.W;sfx('implode',pos,1.2);for(let i=0;i<40;i++){const a=Math.random()*6.28,b=rand(-1,1);PA.emit(pos.x,pos.y,pos.z,Math.cos(a)*30,b*20,Math.sin(a)*30,i%2?tmpC.setRGB(.6,.3,1):COL.white,.6,.5,0,1.5,0)}
+  setTimeout(()=>{if(G.mode!=='play')return;explodeAt(pos,W,p.owner,p.src,'singularity')},330)}
 function killProj(i){const p=G.projs[i];if(p.mesh)scene.remove(p.mesh);G.projs.splice(i,1)}
 
 // ================= KILLS / RESPAWN =================
@@ -1474,7 +1508,7 @@ const dps=w=>{const W=WEAPONS[w];return Math.round(W.dmg*(W.pellets||1)*W.rate)}
 function renderGarage(){
   cardList('#cChassis','ch',Object.entries(CHASSIS),k=>cfg.ch===k,(k,d)=>'<b>'+d.name+'</b><i>'+d.cls+'</i><span>ARMOR '+d.hp+' · SPEED '+d.speed+'</span>',k=>cfg.ch=k);
   const wb=(k,d)=>'<b>'+d.name+'</b><i>'+(WTYPE[k]||'')+(WDESC[k]?' · '+WDESC[k]:'')+'</i><span>'+(d.melee?'DMG '+d.dmg+' · ':'')+'DPS '+dps(k)+' · HEAT '+Math.round(d.heat*d.rate)+'/s</span>';
-  const fe=$('#wfilter');fe.innerHTML='';['ALL','BALLISTIC','ENERGY','EXPLOSIVE','CHEMICAL','MELEE'].forEach(t=>{const b=document.createElement('button');b.className='btn'+(gFilter===t?' sel':'');b.textContent=t;b.style.fontSize='11px';b.style.padding='4px 7px';b.onclick=()=>{gFilter=t;renderGarage();sfx('click')};fe.appendChild(b)});
+  const fe=$('#wfilter');fe.innerHTML='';['ALL','BALLISTIC','ENERGY','EXPLOSIVE','CHEMICAL','MELEE','EXOTIC'].forEach(t=>{const b=document.createElement('button');b.className='btn'+(gFilter===t?' sel':'');b.textContent=t;b.style.fontSize='11px';b.style.padding='4px 7px';b.onclick=()=>{gFilter=t;renderGarage();sfx('click')};fe.appendChild(b)});
   const arms=Object.entries(WEAPONS).filter(([k])=>isArm(k)&&(gFilter==='ALL'||WTYPE[k]===gFilter||k===cfg.wl||k===cfg.wr));
   cardList('#cWL','w',arms,k=>cfg.wl===k,wb,k=>cfg.wl=k);cardList('#cWR','w',arms,k=>cfg.wr===k,wb,k=>cfg.wr=k);
   cardList('#cWB','w',[['none',{name:'Empty',cost:0}],...Object.entries(WEAPONS).filter(([k,d])=>d.back)],k=>cfg.wb===k,(k,d)=>k==='none'?'<b>Empty</b><span>No back weapon · lighter look</span>':wb(k,d),k=>cfg.wb=k);
