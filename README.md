@@ -12,6 +12,14 @@ A 3D browser game about building custom war mechs and battling in an abandoned w
 - **World:** a ruined city map with dust storms, supply drops, time of day and destructible-looking wreckage.
 - **Graphics:** post-processing (bloom and colour grading) with Low / Medium / High quality settings.
 
+## Platforms
+Runs in any modern browser on desktop, laptop, tablet and phone. The interface scales to any screen size.
+- **Touch (phones and tablets):** a floating joystick on the left; drag the right side to aim; buttons for FIRE (drag them to aim too), JUMP (hold for jetpack), SYSTEM, BACK weapon, BOOST, VENT, scores and pause. Light aim assist helps while firing. Landscape is recommended, and phones default to Low graphics.
+- **Game controllers:** left stick moves, right stick aims, RT/LT fire the right/left arm, RB back weapon, A jump, LB system, B or L3 boost, X vent, Y scores, Start pause or deploy.
+- **Mouse and keyboard:** see below. Key positions work on any keyboard layout (e.g. AZERTY).
+
+The Controls setting in the garage switches between Auto, Touch and Mouse+Keys. There's also a fullscreen button.
+
 ## Controls
 | Key | Action |
 |---|---|
