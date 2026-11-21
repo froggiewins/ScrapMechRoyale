@@ -16,6 +16,7 @@ A 3D browser game about building custom war mechs and battling in an abandoned w
 Runs in any modern browser on desktop, laptop, tablet and phone. The interface scales to any screen size.
 - **Touch (phones and tablets):** a floating joystick on the left; drag the right side to aim; buttons for FIRE (drag them to aim too), JUMP (hold for jetpack), SYSTEM, BACK weapon, BOOST, VENT, scores and pause. Light aim assist helps while firing. Landscape is recommended, and phones default to Low graphics.
 - **Game controllers:** left stick moves, right stick aims, RT/LT fire the right/left arm, RB back weapon, A jump, LB system, B or L3 boost, X vent, Y scores, Start pause or deploy.
+- **VR headsets (WebXR, e.g. Meta Quest browser):** press **PLAY IN VR** in the garage. Left stick moves (head-relative); each trigger fires the arm on that side, aimed where that controller points; right grip fires the back weapon; left grip boosts; A jumps (hold for jetpack); X uses your system; Y vents; B or right-stick click switches between cockpit and chase view; flick the right stick left/right to snap-turn. A HUD floats below your view. Post-processing is turned off in VR for performance.
 - **Mouse and keyboard:** see below. Key positions work on any keyboard layout (e.g. AZERTY).
 
 The Controls setting in the garage switches between Auto, Touch and Mouse+Keys. There's also a fullscreen button.
